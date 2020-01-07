@@ -29,6 +29,9 @@ h1, h2, h3 {
  border-bottom:1px solid #999;
  padding-bottom:1px;
  margin-bottom:0.25em;
+ /* font trickery */
+ -moz-osx-font-smoothing: grayscale;
+ -webkit-font-smoothing: antialiased;
 }
 
 h1 {
@@ -94,7 +97,7 @@ pre {
 }
 
 code {
- font-family:"lucida console",monaco,courier,terminal,system;
+ font-family:"lucida console",monaco,courier,system;
  font-size:1em;
  color:#003366;
 }

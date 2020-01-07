@@ -4,15 +4,15 @@
 
 	SoundManager 2 buildfile (Ant)
 
-	This is tested on OS X and Windows and uses Google's closure compiler, MTASC to build the Flash 8 stuff, and mxmlc (Adobe Flex Open Source SDK) for the Flash 9 versions.
-	Perl is also still used for file, but just comment the
-	part that uses it if you don't have Perl.
+	This is tested on OS X and Windows and uses Google's Closure Compiler (JS), MTASC (Flash 8) and mxmlc (Adobe Flex Open Source SDK) for the Flash 9 build.
+	Perl is used only to display file sizes during compilation, and can be commented out if you don't have it installed.
 
     USAGE
 
 	- Go to the soundmanager2 root directory (ie., where this build.xml file is.)
-	- Create the file .build.properties containing the paths to the external tools:
+	- Create the file .build.properties containing the paths to the external tools.
 	  For example, on Windows:
+
 		closure-compiler.jar=C:\\Tools\\closure\\compiler.jar
 		mtasc=C:\\Tools\\mtasc\\mtasc.exe
 		mxmlc=C:\\Tools\\flex_sdk\\bin\\mxmlc.exe
@@ -21,9 +21,18 @@
 
 	RELATED DOWNLOADS
 
+    Google Closure Compiler
 	http://code.google.com/closure/compiler/
+
+    MTASC (Windows / OS X / Linux) compiler for AS2/Flash 8 SWF
 	http://www.mtasc.org/
+
+    Precompiled MTASC binaries (eg., Universal binary that should work on OS X Lion):
+    http://lists.motion-twin.com/pipermail/mtasc/2007-February/030170.html
+
+    Adobe Flex Open Source SDK (including mxmlc compiler) for AS3/Flash 9 SWF
 	http://opensource.adobe.com/wiki/display/flexsdk/Flex+SDK
+	** NOTE: ExternalInterface issues were found in SWFs compiled with Flex SDK version 4.5.1.21328. Do not use 4.5.x. Instead, use Flex SDK version 4.1.0.16076 to be safe, which has been confirmed to work with SM2 (Flash 9 version.) **
 
 	WHAT IS AUTOMATED
 
@@ -40,8 +49,8 @@
 <project name="SoundManager 2" default="build" basedir=".">
 
   <property file='${basedir}/.build.properties'/>
-  <property name='mxmlc' value='mxmlc'/>
-  <property name='mtasc' value='mtasc'/>
+  <property name='mxmlc' value='/Applications/mxmlc/bin/mxmlc'/>
+  <property name='mtasc' value='/Applications/mtasc/mtasc'/>
   <property name='closure-compiler.jar' value="${user.home}/compiler.jar"/>
 
   <echo>${closure-compiler.jar}</echo>
@@ -49,20 +58,19 @@
 
 <target name="build">
 
-<echo>Compressing minified JS...</echo>
+<echo>Removing existing JS builds...</echo>
 
-<!--
-<exec executable="/bin/sh">
- <arg line='-c "java -jar ~/yuicompressor-2.4.2.jar script/soundmanager2.js -o script/soundmanager2-jsmin.js"'/>
-</exec>
--->
+<delete file="script/soundmanager2-nodebug.js"/>
+<delete file="script/soundmanager2-jsmin.js"/>
+<delete file="script/soundmanager2-nodebug-jsmin.js"/>
+
+<echo>Compressing minified JS...</echo>
 
 <mkdir dir="tmp"/>
 
 <!-- Google Closure Compiler -->
 <echo level="debug"
  message="java -jar ${closure-compiler.jar} --compilation_level SIMPLE_OPTIMIZATIONS --js script/soundmanager2.js --js_output_file tmp/soundmanager2-jsmin-temp.js"/>
-
 
 <jscomp compilationLevel="simple" debug="false" output="script/soundmanager2-jsmin.js">
     <sources dir="script">
@@ -71,9 +79,10 @@
 </jscomp>
 
 <!-- Retain license comment through further closure compiler minification -->
+
 <replace file="script/soundmanager2-jsmin.js">
     <replacefilter>
-	<replacetoken>/*</replacetoken>
+	<replacetoken>/**</replacetoken>
 	<replacevalue>/** @license</replacevalue>
     </replacefilter>
 </replace>
@@ -83,61 +92,71 @@
 <copy file="script/soundmanager2.js" tofile="script/soundmanager2-nodebug.js" overwrite="true"/>
 
 <replace file="script/soundmanager2-nodebug.js">
-    <!-- Fix license comment -->
-    <!--
-    <replacefilter>
-	<replacetoken>/*</replacetoken>
-	<replacevalue>/** @license</replacevalue>
-    </replacefilter>
-    -->
     <!-- Set debug mode -->
     <replacefilter>
 	<replacetoken>this.debugMode = true;</replacetoken>
 	<replacevalue>this.debugMode = false;</replacevalue>
     </replacefilter>
-    <!-- _s._wD() / _wDS() -->
-    <replacefilter>
-	<replacetoken>_s._wD(</replacetoken>
-	<replacevalue>//_s._wD(</replacevalue>
-    </replacefilter>
-    <replacefilter>
-	<replacetoken>_wDS(</replacetoken>
-	<replacevalue>//_wDS(</replacevalue>
-    </replacefilter>
-    <!-- _debugTS() -->
-    <replacefilter>
-	<replacetoken>_debugTS(</replacetoken>
-	<replacevalue>//_debugTS(</replacevalue>
-    </replacefilter>
-    <!-- <d> and </d> -->
-    <replacefilter>
-	<replacetoken>// &lt;d&gt;</replacetoken>
-	<replacevalue>/*</replacevalue>
-    </replacefilter>
-    <replacefilter>
-	<replacetoken>// &lt;/d&gt;</replacetoken>
-	<replacevalue>*/</replacevalue>
-    </replacefilter>
 </replace>
 
+<!-- remove [d] and [/d] blocks -->
+<replaceregexp match="// &lt;d&gt;*.+?// &lt;\/d&gt;" replace="" flags="gs" byline="false" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove sm2._wD() calls -->
+<replaceregexp match="\s+sm2._wD\(*.+?\);" replace="" flags="s" byline="true" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove _wDS() calls -->
+<replaceregexp match="\s+_wDS\(*.+?\);" replace="" flags="s" byline="true" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove debugTS() calls -->
+<replaceregexp match="\s+debugTS\(*.+?\);" replace="" flags="s" byline="true" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove complain() calls -->
+<replaceregexp match="\s+complain\(*.+?\);" replace="" flags="s" byline="true" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove single-line comments -->
+<replaceregexp match="\s+?//.*" replace="" flags="s" byline="true" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove multi-line comments -->
+<replaceregexp match="/\*.+?\*/" replace="" flags="gs" byline="false" file="script/soundmanager2-nodebug.js" />
+
+<!-- remove multiple linebreaks, replace with one (could be improved) -->
+<replaceregexp file="script/soundmanager2-nodebug.js" match="\s+(\r\n)" flags="g" replace="\1" />
+
+<!-- more newline removal (license header) -->
+<!--
+<replaceregexp file="script/soundmanager2-jsmin.js" match="(\r?\n)+" flags="g" replace="\1" />
+-->
 
 <echo>Compressing no-debug JS...</echo>
 
-<!--
-<echo>[YUICompressor]</echo>
-<exec executable="/bin/sh">
- <arg line='-c "java -jar ~/yuicompressor-2.4.2.jar sm2-nodebug-temp6.js -o script/soundmanager2-nodebug-yuicompressor.js"'/>
-</exec>
--->
-
 <jscomp compilationLevel="simple" output="script/soundmanager2-nodebug-jsmin.js">
-    <sources dir="script">
-	<file name="soundmanager2-nodebug.js"/>
-    </sources>
+	<sources dir="script">
+		<file name="soundmanager2-nodebug.js"/>
+	</sources>
 </jscomp>
 
-<!-- Retain license comment through further closure compiler minification -->
+<!-- retain license comment through further closure compiler minification? -->
+
+<replace file="script/soundmanager2-jsmin.js" token="/*" value="/** @license"/>
 <replace file="script/soundmanager2-nodebug-jsmin.js" token="/*" value="/** @license"/>
+
+<!-- fetch the license from the full source, and prepend it to the jsmin builds. -->
+
+<!-- a cheap hack: Read the first N lines of a file -->
+<loadfile property="sm2_license" srcFile="script/soundmanager2.js">
+	<filterchain>
+    	<headfilter lines="12"/>
+  </filterchain>
+</loadfile>
+
+<echo>Retrieved SM2 license:</echo>
+<echo>${sm2_license}</echo>
+
+<!-- prepend license -->
+<!-- this is stupid, there must be a better concat + prepend way, but I couldn't seem to find it. -->
+<replaceregexp file="script/soundmanager2-nodebug.js" match="(.*+)" flags="s" replace="${sm2_license}\1" />
+<replaceregexp file="script/soundmanager2-nodebug-jsmin.js" match="(.*+)" flags="s" replace="${sm2_license}\1" />
 
 <!-- show size -->
 
@@ -147,23 +166,6 @@
 <exec executable="perl">
     <arg line='-e "print qq($_: ), (stat $_)[7], qq(\n) for @ARGV" script/soundmanager2.js script/soundmanager2-jsmin.js script/soundmanager2-nodebug.js script/soundmanager2-nodebug-jsmin.js'/>
 </exec>
-<!--
-<exec executable="perl">
- <arg line='-e &#39;printf &#34;%d&#34; ,(stat(shift))[7]; &#39; script/soundmanager2.js'/>
-</exec>
-
-<exec executable="perl">
- <arg line='-e &#39;printf &#34;%d&#34; ,(stat(shift))[7]; &#39; script/soundmanager2-jsmin.js'/>
-</exec>
-
-<exec executable="perl">
- <arg line='-e &#39;printf &#34;%d&#34; ,(stat(shift))[7]; &#39; script/soundmanager2-nodebug.js'/>
-</exec>
-
-<exec executable="perl">
- <arg line='-e &#39;printf &#34;%dn&#34; ,(stat(shift))[7]; &#39; script/soundmanager2-nodebug-jsmin.js'/>
-</exec>
--->
 
 <echo>Building debug version, Flash 8/AS2...</echo>
 
@@ -187,13 +189,6 @@
 <!-- flash 8 debug -->
 
 <replace file="tmp/soundmanager2_flash_nodebug/SoundManager2.as">
-    <!-- Fix license comment -->
-    <!--
-    <replacefilter>
-	<replacetoken>/*</replacetoken>
-	<replacevalue>/** @license</replacevalue>
-    </replacefilter>
-    -->
     <!-- Set debug mode -->
     <replacefilter>
 	<replacetoken>var debugEnabled = true;</replacetoken>
@@ -220,7 +215,6 @@
 	<replacevalue>// writeDebug(</replacevalue>
     </replacefilter>
 </replace>
-
 
 <!-- flash 9 debug: SoundManager2 -->
 
@@ -286,7 +280,6 @@
 
 <replace file="tmp/soundmanager2_flash_xdomain/SoundManager2.as" token="var allow_xdomain_scripting = false;" value="var allow_xdomain_scripting = true;"/>
 <replace file="tmp/soundmanager2_flash_xdomain/SoundManager2_AS3.as" token="var allow_xdomain_scripting:Boolean = false;" value="var allow_xdomain_scripting:Boolean = true;"/>
-
 
 <!-- -nodebug cross-domain -->
 
